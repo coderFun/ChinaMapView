@@ -70,5 +70,8 @@ public class ChinaMap {
     public static final int indexTaiWan = 31;
     public static final int indexHaiNan = 32;
 
-    public static final String[] svgProvinces = {NeiMengGu, GanSu, NingXia, XinJiang, QingHai, SiChuan, XiZang, YunNan, GuiZhou, GuangXi, ChongQing, Shan3Xi, Shan1Xi, HuNan, HuBei, GuangDong, JiangXi, FuJian, ZheJiang, AnHui, TianJin, BeiJing, LiaoNing, JiLin, HeiLongJiang, ShanDong, ShangHai, JiangSu, HeBei, HeNan, TaiWan, HaiNan};
+    public static final String[] svgProvinces = {NeiMengGu, GanSu, NingXia, XinJiang, QingHai, SiChuan,
+            XiZang, YunNan, GuiZhou, GuangXi, ChongQing, Shan3Xi, Shan1Xi, HuNan, HuBei, GuangDong,
+            JiangXi, FuJian, ZheJiang, AnHui, TianJin, BeiJing, LiaoNing, JiLin, HeiLongJiang,
+            ShanDong, ShangHai, JiangSu, HeBei, HeNan, TaiWan, HaiNan};
 }

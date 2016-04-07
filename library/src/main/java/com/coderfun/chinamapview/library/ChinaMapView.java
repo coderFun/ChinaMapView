@@ -17,9 +17,18 @@ import java.util.ArrayList;
 
 /**
  * a view to show a china map
+ * It will crushed if scale too large and I can't find the reason.
  */
 public class ChinaMapView extends View {
     public static final String TAG = "ChinaMapView";
+    /**
+     * max scale ratio of china map
+     */
+    public static final float MAX_SCALE_RATIO = 15;
+    /**
+     * min scale ratio of china map
+     */
+    public static final float MIN_SCALE_RATIO = 0.15f;
     Paint paint;
     Paint paintMarked;
 
@@ -31,7 +40,7 @@ public class ChinaMapView extends View {
     ArrayList<Path> distPaths = new ArrayList<>();
     private Path markedPath;
     Region region = new Region();
-
+    Rect screen;
 
     float translateX;
     float translateY;
@@ -65,7 +74,7 @@ public class ChinaMapView extends View {
         paintMarked.setStyle(Paint.Style.FILL);
         paintMarked.setAntiAlias(true);
 
-        Rect screen = new Rect(0, 0, getResources().getDisplayMetrics().widthPixels, getResources().getDisplayMetrics().heightPixels);
+        screen = new Rect(0, 0, getResources().getDisplayMetrics().widthPixels, getResources().getDisplayMetrics().heightPixels);
 
         region.set(screen);
 
@@ -81,6 +90,7 @@ public class ChinaMapView extends View {
             distPaths.add(new Path());
         }
         rectMapDist.set(rectMap);
+        Log.e(TAG, "init: "+rectMap );
     }
 
     @Override
@@ -89,24 +99,35 @@ public class ChinaMapView extends View {
 
     }
 
+    float fitScale;
+
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
-        Log.e(TAG, "onSizeChanged: ");
-
-        float xRatio = getMeasuredWidth() /  rectMap.width();
+        float xRatio = getMeasuredWidth() / rectMap.width();
         float yRatio = getMeasuredHeight() / rectMap.height();
         scaleRatio = xRatio > yRatio ? yRatio : xRatio;
+        fitScale = scaleRatio;
+        Matrix matrix = new Matrix();
+        matrix.setTranslate((getMeasuredWidth()-rectMap.width())/2,(getMeasuredHeight()- rectMap.height())/2);
+        matrix.mapRect(rectMap);
+        rectMapDist.set(rectMap);
+        Log.e(TAG, "onSizeChanged: "+rectMapDist );
+        for (int i = 0; i < distPaths.size(); i++) {
+            paths.get(i).transform(matrix);
+        }
         resizeMap(true);
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-
-
         for (int i = 0; i < paths.size(); i++) {
-            canvas.drawPath(distPaths.get(i), paint);
+
+            if (Rect.intersects(screen, regions.get(i).getBounds())) {
+                canvas.drawPath(distPaths.get(i), paint);
+                canvas.clipRect(screen);
+            }
         }
         if (markedPath != null) {
             canvas.drawPath(markedPath, paintMarked);
@@ -115,17 +136,33 @@ public class ChinaMapView extends View {
 
     private void resizeMap(boolean shouldRegion) {
         matrix.reset();
+        if (scaleRatio > MAX_SCALE_RATIO) {
+            scaleRatio = MAX_SCALE_RATIO;
+        } else if (scaleRatio < MIN_SCALE_RATIO) {
+            scaleRatio = MIN_SCALE_RATIO;
+        }
+        float maxTranslateX = getMeasuredWidth()/fitScale*scaleRatio;
+        float maxTranslateY = getMeasuredHeight()/fitScale*scaleRatio;
+        if (translateX > maxTranslateX) {
+            translateX = maxTranslateX;
+        } else if (translateX < -maxTranslateX) {
+            translateX = -maxTranslateX;
+        }
+        if (translateY > maxTranslateY) {
+            translateY =maxTranslateY;
+        } else if (translateY < -maxTranslateY) {
+            translateY = -maxTranslateY;
+        }
         matrix.setScale(scaleRatio, scaleRatio, rectMapDist.centerX(), rectMapDist.centerY());
         matrix.postTranslate(translateX, translateY);
         for (int i = 0; i < regions.size(); i++) {
             paths.get(i).transform(matrix, distPaths.get(i));
         }
-        if(shouldRegion){
+        if (shouldRegion) {
             for (int i = 0; i < regions.size(); i++) {
                 regions.get(i).setPath(distPaths.get(i), region);
             }
         }
-
     }
 
     int x1;
@@ -136,11 +173,12 @@ public class ChinaMapView extends View {
     float tempX;
     float tempY;
     float tempScale;
+
+    int scaleTolerance = 60;
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        //Log.e(TAG, "onTouchEvent: " + event.getPointerCount());
         if (event.getPointerCount() == 2) {
-            //Log.e(TAG, "onTouchEvent: " + event.getActionMasked());
             markedPath = null;
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_POINTER_DOWN:
@@ -148,7 +186,7 @@ public class ChinaMapView extends View {
                     x2 = (int) event.getX(1);
                     y1 = (int) event.getY(0);
                     y2 = (int) event.getX(1);
-                    distance =  Math.sqrt(Math.pow((event.getX(1)-event.getX(0)),2)+Math.pow((event.getX(1)-event.getY(0)),2));
+                    distance = Math.sqrt(Math.pow((event.getX(1) - event.getX(0)), 2) + Math.pow((event.getY(1) - event.getY(0)), 2));
                     tempX = translateX;
                     tempY = translateY;
                     tempScale = scaleRatio;
@@ -156,11 +194,11 @@ public class ChinaMapView extends View {
                 case MotionEvent.ACTION_MOVE:
                     translateX = tempX + event.getX(0) - x1;
                     translateY = tempY + event.getY(0) - y1;
-                    double distance2 = Math.sqrt(Math.pow((event.getX(1)-event.getX(0)),2)+Math.pow((event.getX(1)-event.getY(0)),2));
-                    if(Math.abs(distance2-distance)>20){
-                        scaleRatio = tempScale * (float) ((distance2-20) /distance);
+                    double distance2 = Math.sqrt(Math.pow((event.getX(1) - event.getX(0)), 2) + Math.pow((event.getY(1) - event.getY(0)), 2));
+                    if (Math.abs(distance2 - distance) > scaleTolerance) {
+                        scaleRatio = tempScale * (float) ((distance2 - scaleTolerance) / distance);
                     }
-                    resizeMap(false);
+                    resizeMap(true);
                     invalidate();
                     break;
                 case MotionEvent.ACTION_POINTER_UP:
